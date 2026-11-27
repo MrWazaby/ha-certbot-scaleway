@@ -1,0 +1,94 @@
+#!/usr/bin/with-contenv bashio
+# ==============================================================================
+# Request and renew Let's Encrypt certificates through the Scaleway DNS API
+# (certbot-dns-scaleway, dns-01 challenge). The certificate is published to
+# the ssl share (/ssl/fullchain.pem and /ssl/privkey.pem).
+# ==============================================================================
+
+declare -a domains domain_args certbot_args
+declare email token propagation renew_interval
+
+CREDENTIALS_FILE=/data/scaleway-credentials.ini
+CONFIG_DIR=/data/letsencrypt
+WORK_DIR=/data/work
+LOGS_DIR=/data/logs
+DEPLOY_HOOK=/usr/bin/deploy-cert.sh
+SSL_DIR=/ssl
+
+email=$(bashio::config 'email')
+token=$(bashio::config 'scaleway_api_token')
+propagation=$(bashio::config 'dns_propagation_seconds')
+renew_interval=$(bashio::config 'renew_interval_hours')
+
+if bashio::var.is_empty "${email}"; then
+    bashio::log.error "The 'email' option is required, it is used to register the Let's Encrypt account."
+    exit 1
+fi
+if bashio::var.is_empty "${token}"; then
+    bashio::log.error "The 'scaleway_api_token' option is required, create an API token in the Scaleway console."
+    exit 1
+fi
+
+mapfile -t domains < <(jq -r '.domains[]' /data/options.json)
+if [[ ${#domains[@]} -eq 0 ]] || bashio::var.is_empty "${domains[0]}"; then
+    bashio::log.error "At least one domain must be set in the 'domains' option."
+    exit 1
+fi
+
+mkdir -p "${CONFIG_DIR}" "${WORK_DIR}" "${LOGS_DIR}" "${SSL_DIR}"
+
+# Credentials file for certbot-dns-scaleway, readable by root only
+umask 077
+printf 'dns_scaleway_application_token = %s\n' "${token}" > "${CREDENTIALS_FILE}"
+chmod 600 "${CREDENTIALS_FILE}"
+
+for domain in "${domains[@]}"; do
+    domain_args+=(-d "${domain}")
+done
+
+certbot_args=(
+    certonly
+    --non-interactive
+    --agree-tos
+    --email "${email}"
+    --authenticator dns-scaleway
+    --dns-scaleway-credentials "${CREDENTIALS_FILE}"
+    --dns-scaleway-propagation-seconds "${propagation}"
+    --config-dir "${CONFIG_DIR}"
+    --work-dir "${WORK_DIR}"
+    --logs-dir "${LOGS_DIR}"
+    --cert-name "${domains[0]}"
+    --deploy-hook "${DEPLOY_HOOK}"
+    --keep-until-expiring
+    "${domain_args[@]}"
+)
+if bashio::config.true 'staging'; then
+    certbot_args+=(--staging)
+    bashio::log.warning "Using the Let's Encrypt staging environment, issued certificates are NOT trusted by browsers."
+fi
+
+bashio::log.info "Requesting certificate for: ${domains[*]}"
+if certbot "${certbot_args[@]}"; then
+    bashio::log.info "Certificate is present and valid, or has just been issued."
+else
+    bashio::log.error "Could not obtain a certificate yet, retrying at the next renewal check."
+fi
+
+# Make sure the ssl share is populated even on the very first issuance
+if [[ -f "${CONFIG_DIR}/live/${domains[0]}/fullchain.pem" ]]; then
+    RENEWED_LINEAGE="${CONFIG_DIR}/live/${domains[0]}" "${DEPLOY_HOOK}"
+fi
+
+while true; do
+    bashio::log.info "Checking certificates for renewal, next check in ${renew_interval} hour(s)..."
+    if certbot renew \
+        --non-interactive \
+        --config-dir "${CONFIG_DIR}" \
+        --work-dir "${WORK_DIR}" \
+        --logs-dir "${LOGS_DIR}"; then
+        bashio::log.info "Renewal check finished."
+    else
+        bashio::log.error "Renewal check failed, retrying in ${renew_interval} hour(s)."
+    fi
+    sleep $((renew_interval * 3600))
+done

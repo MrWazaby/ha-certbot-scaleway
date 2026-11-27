@@ -1,0 +1,26 @@
+configuration:
+  domains:
+    name: Domains
+    description: >-
+      List of domains to include in the certificate. The first domain is used
+      as the certificate name. Wildcards such as *.example.com are supported.
+  email:
+    name: Email
+    description: Email address used for the Let's Encrypt account (required).
+  scaleway_api_token:
+    name: Scaleway API token
+    description: >-
+      Scaleway API token (secret key) with DNS permissions, created in the
+      Scaleway console. It is written to the certbot-dns-scaleway credentials
+      file as dns_scaleway_application_token.
+  staging:
+    name: Use Let's Encrypt staging
+    description: >-
+      Issue certificates from the Let's Encrypt staging environment. Useful for
+      testing; staging certificates are not trusted by browsers.
+  dns_propagation_seconds:
+    name: DNS propagation wait (seconds)
+    description: How long to wait for the _acme-challenge TXT record to propagate before validation.
+  renew_interval_hours:
+    name: Renewal check interval (hours)
+    description: How often the app checks whether the certificate needs to be renewed.
