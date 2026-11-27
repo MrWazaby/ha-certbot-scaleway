@@ -56,7 +56,7 @@ The certificate is available in the `ssl` share of your Home Assistant host as `
 
 ### Serve Home Assistant over HTTPS via the network settings
 
-1. Wait until the app has issued the certificate (check the app log, or confirm the files exist in the `ssl` share).
+1. Wait until the app has issued **and deployed** the certificate: the app log shows `Certificate deployed to /ssl/fullchain.pem and /ssl/privkey.pem` and the files exist in the `ssl` share. Home Assistant validates the certificate paths when it starts, so configuring it before the files exist fails with `not a file at 'config.ssl_certificate'`.
 2. In Home Assistant, go to **Settings > System > Network**.
 3. In the **HTTP server** section, set:
    - **SSL certificate path**: `/ssl/fullchain.pem`
@@ -79,6 +79,7 @@ Other apps that map the `ssl` share can use `/ssl/fullchain.pem` and `/ssl/privk
 ## Troubleshooting
 
 - **App stops immediately with a log error**: check that `email`, `scaleway_api_token` and at least one entry in `domains` are set. The full certbot output is in the app log.
+- **`not a file at 'config.ssl_certificate'` (or `config.ssl_key`) in the Home Assistant log**: `/ssl/fullchain.pem` or `/ssl/privkey.pem` does not exist yet. Check the app log for `Certificate deployed to /ssl/...` and wait for the first issuance (or fix the app error first). With the UI HTTP server settings, Home Assistant falls back to the last working configuration when the certificate file is missing.
 - **"Can't find domain to use with the Scaleway API"**: the domain is not a DNS zone (or subdomain of a zone) in the Scaleway project of the token. Add the domain in **Scaleway console > Domains and DNS**.
 - **Validation fails / timeouts**: increase `dns_propagation_seconds` (Scaleway DNS can be slow to propagate).
 - **Rate limits**: Let's Encrypt limits production certificate issuances per domain. Use `staging: true` while testing, and avoid deleting `/data/letsencrypt` repeatedly.

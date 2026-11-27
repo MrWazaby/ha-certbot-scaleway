@@ -6,7 +6,7 @@ The issued certificate is published to the `ssl` share as `fullchain.pem` and `p
 
 ## Using the certificate in Home Assistant (network settings)
 
-Once the app has issued a certificate, serve Home Assistant itself over HTTPS:
+Wait until the app has issued **and deployed** the certificate — the app log shows `Certificate deployed to /ssl/fullchain.pem and /ssl/privkey.pem` and the files exist in the `ssl` share (Home Assistant checks that these files exist when it starts). Then serve Home Assistant itself over HTTPS:
 
 1. In Home Assistant, go to **Settings > System > Network**.
 2. In the **HTTP server** section, set **SSL certificate path** to `/ssl/fullchain.pem` and **SSL key path** to `/ssl/privkey.pem`.

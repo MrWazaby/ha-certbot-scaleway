@@ -77,7 +77,7 @@ fi
 
 # Make sure the ssl share is populated even on the very first issuance
 if [[ -f "${CONFIG_DIR}/live/${domains[0]}/fullchain.pem" ]]; then
-    RENEWED_LINEAGE="${CONFIG_DIR}/live/${domains[0]}" "${DEPLOY_HOOK}"
+    "${DEPLOY_HOOK}" "${CONFIG_DIR}/live/${domains[0]}"
 fi
 
 while true; do
