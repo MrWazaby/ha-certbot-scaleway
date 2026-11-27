@@ -1,6 +1,6 @@
 # https://developers.home-assistant.io/docs/apps/reference/configuration/
 name: Certbot Scaleway
-version: "1.0.0"
+version: "1.1.0"
 slug: certbot_scaleway
 description: >-
   Generate and automatically renew Let's Encrypt certificates for your domains
@@ -17,6 +17,7 @@ options:
   staging: false
   dns_propagation_seconds: 60
   renew_interval_hours: 12
+  renew_retry_interval_hours: 2
 schema:
   domains:
     - str
@@ -25,4 +26,5 @@ schema:
   staging: bool
   dns_propagation_seconds: int(30,3600)
   renew_interval_hours: int(1,720)
+  renew_retry_interval_hours: int(1,720)
 image: "ghcr.io/mrwazaby/ha-certbot-scaleway"

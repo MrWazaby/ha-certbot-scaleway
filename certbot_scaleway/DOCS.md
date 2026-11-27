@@ -19,6 +19,7 @@ The dns-01 challenge only creates a temporary TXT record through the Scaleway AP
 | `staging` | no | `false` | Use the Let's Encrypt **staging** environment (for testing; certificates are not trusted by browsers and avoid production rate limits). |
 | `dns_propagation_seconds` | no | `60` | Seconds to wait for the `_acme-challenge` TXT record to propagate before validation. Increase this if validation fails with propagation errors. |
 | `renew_interval_hours` | no | `12` | How often to check whether the certificate must be renewed. Certbot only renews certificates that expire within 30 days. |
+| `renew_retry_interval_hours` | no | `2` | Sleep between renewal attempts after a failed `certbot renew` (e.g. transient DNS or API error), instead of waiting the full `renew_interval_hours`. |
 
 Example:
 
@@ -31,6 +32,7 @@ scaleway_api_token: 11111111-2222-3333-4444-555555555555
 staging: false
 dns_propagation_seconds: 60
 renew_interval_hours: 12
+renew_retry_interval_hours: 2
 ```
 
 ### Getting a Scaleway API token
@@ -45,7 +47,7 @@ The token is stored with `0600` permissions in `/data/scaleway-credentials.ini` 
 
 - On start, the app writes the Scaleway credentials file, then runs `certbot certonly --authenticator dns-scaleway` with `--keep-until-expiring` (so restarts do not trigger new issuances).
 - A deploy hook copies `fullchain.pem` / `privkey.pem` to the `ssl` share (`/ssl`) after every issuance and renewal.
-- The app then loops: every `renew_interval_hours` it runs `certbot renew`, which renews the certificate only when it is due (within 30 days of expiry) and re-runs the deploy hook.
+- The app then loops: every `renew_interval_hours` it runs `certbot renew`, which renews the certificate only when it is due (within 30 days of expiry) and re-runs the deploy hook. If a renewal attempt fails, the next attempt happens after `renew_retry_interval_hours` (default `2`) instead of the full check interval.
 - Certbot state is kept in `/data/letsencrypt`, so certificates survive app restarts and updates.
 
 ## Using the certificate
