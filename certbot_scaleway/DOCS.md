@@ -19,6 +19,7 @@ The dns-01 challenge only creates a temporary TXT record through the Scaleway AP
 | `staging` | no | `false` | Use the Let's Encrypt **staging** environment (for testing; certificates are not trusted by browsers and avoid production rate limits). |
 | `dns_propagation_seconds` | no | `60` | Seconds to wait for the `_acme-challenge` TXT record to propagate before validation. Increase this if validation fails with propagation errors. |
 | `renew_interval_hours` | no | `12` | How often to check whether the certificate must be renewed. Certbot only renews certificates that expire within 30 days. |
+| `renew_retry_interval_hours` | no | `2` | Sleep between renewal attempts after a failed `certbot renew` (e.g. transient DNS or API error), instead of waiting the full `renew_interval_hours`. |
 
 Example:
 
@@ -31,6 +32,7 @@ scaleway_api_token: 11111111-2222-3333-4444-555555555555
 staging: false
 dns_propagation_seconds: 60
 renew_interval_hours: 12
+renew_retry_interval_hours: 2
 ```
 
 ### Getting a Scaleway API token
@@ -45,12 +47,24 @@ The token is stored with `0600` permissions in `/data/scaleway-credentials.ini` 
 
 - On start, the app writes the Scaleway credentials file, then runs `certbot certonly --authenticator dns-scaleway` with `--keep-until-expiring` (so restarts do not trigger new issuances).
 - A deploy hook copies `fullchain.pem` / `privkey.pem` to the `ssl` share (`/ssl`) after every issuance and renewal.
-- The app then loops: every `renew_interval_hours` it runs `certbot renew`, which renews the certificate only when it is due (within 30 days of expiry) and re-runs the deploy hook.
+- The app then loops: every `renew_interval_hours` it runs `certbot renew`, which renews the certificate only when it is due (within 30 days of expiry) and re-runs the deploy hook. If a renewal attempt fails, the next attempt happens after `renew_retry_interval_hours` (default `2`) instead of the full check interval.
 - Certbot state is kept in `/data/letsencrypt`, so certificates survive app restarts and updates.
 
 ## Using the certificate
 
-The certificate is available in the `ssl` share of your Home Assistant host. To serve Home Assistant itself over HTTPS, add to `configuration.yaml`:
+The certificate is available in the `ssl` share of your Home Assistant host as `fullchain.pem` and `privkey.pem`.
+
+### Serve Home Assistant over HTTPS via the network settings
+
+1. Wait until the app has issued **and deployed** the certificate: the app log shows `Certificate deployed to /ssl/fullchain.pem and /ssl/privkey.pem` and the files exist in the `ssl` share. Home Assistant validates the certificate paths when it starts, so configuring it before the files exist fails with `not a file at 'config.ssl_certificate'`.
+2. In Home Assistant, go to **Settings > System > Network**.
+3. In the **HTTP server** section, set:
+   - **SSL certificate path**: `/ssl/fullchain.pem`
+   - **SSL key path**: `/ssl/privkey.pem`
+4. On the same page, set the **Home Assistant URL** to `https://<your-domain>` so browsers and companion apps connect over HTTPS.
+5. Save. Home Assistant restarts and asks an administrator to confirm the new settings — confirm within 5 minutes, otherwise it falls back to the previous settings.
+
+On older Home Assistant versions where the HTTP server is still configured in YAML, add to `configuration.yaml` instead and restart Home Assistant:
 
 ```yaml
 http:
@@ -58,11 +72,14 @@ http:
   ssl_key: /ssl/privkey.pem
 ```
 
-Then restart Home Assistant. Other apps that map the `ssl` share can use `/ssl/fullchain.pem` and `/ssl/privkey.pem` as well.
+Home Assistant reads the certificate files when the HTTP server starts, so restart Home Assistant after a renewal to serve the renewed certificate.
+
+Other apps that map the `ssl` share can use `/ssl/fullchain.pem` and `/ssl/privkey.pem` as well.
 
 ## Troubleshooting
 
 - **App stops immediately with a log error**: check that `email`, `scaleway_api_token` and at least one entry in `domains` are set. The full certbot output is in the app log.
+- **`not a file at 'config.ssl_certificate'` (or `config.ssl_key`) in the Home Assistant log**: `/ssl/fullchain.pem` or `/ssl/privkey.pem` does not exist yet. Check the app log for `Certificate deployed to /ssl/...` and wait for the first issuance (or fix the app error first). With the UI HTTP server settings, Home Assistant falls back to the last working configuration when the certificate file is missing.
 - **"Can't find domain to use with the Scaleway API"**: the domain is not a DNS zone (or subdomain of a zone) in the Scaleway project of the token. Add the domain in **Scaleway console > Domains and DNS**.
 - **Validation fails / timeouts**: increase `dns_propagation_seconds` (Scaleway DNS can be slow to propagate).
 - **Rate limits**: Let's Encrypt limits production certificate issuances per domain. Use `staging: true` while testing, and avoid deleting `/data/letsencrypt` repeatedly.

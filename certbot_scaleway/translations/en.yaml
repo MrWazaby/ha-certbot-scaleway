@@ -24,3 +24,6 @@ configuration:
   renew_interval_hours:
     name: Renewal check interval (hours)
     description: How often the app checks whether the certificate needs to be renewed.
+  renew_retry_interval_hours:
+    name: Renewal retry interval (hours)
+    description: How long to wait before trying to renew again after a failed renewal attempt.

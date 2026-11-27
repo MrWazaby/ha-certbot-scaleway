@@ -6,7 +6,7 @@
 # ==============================================================================
 
 declare -a domains domain_args certbot_args
-declare email token propagation renew_interval
+declare email token propagation renew_interval renew_retry_interval
 
 CREDENTIALS_FILE=/data/scaleway-credentials.ini
 CONFIG_DIR=/data/letsencrypt
@@ -19,6 +19,7 @@ email=$(bashio::config 'email')
 token=$(bashio::config 'scaleway_api_token')
 propagation=$(bashio::config 'dns_propagation_seconds')
 renew_interval=$(bashio::config 'renew_interval_hours')
+renew_retry_interval=$(bashio::config 'renew_retry_interval_hours')
 
 if bashio::var.is_empty "${email}"; then
     bashio::log.error "The 'email' option is required, it is used to register the Let's Encrypt account."
@@ -76,19 +77,20 @@ fi
 
 # Make sure the ssl share is populated even on the very first issuance
 if [[ -f "${CONFIG_DIR}/live/${domains[0]}/fullchain.pem" ]]; then
-    RENEWED_LINEAGE="${CONFIG_DIR}/live/${domains[0]}" "${DEPLOY_HOOK}"
+    "${DEPLOY_HOOK}" "${CONFIG_DIR}/live/${domains[0]}"
 fi
 
 while true; do
-    bashio::log.info "Checking certificates for renewal, next check in ${renew_interval} hour(s)..."
+    bashio::log.info "Checking certificates for renewal..."
     if certbot renew \
         --non-interactive \
         --config-dir "${CONFIG_DIR}" \
         --work-dir "${WORK_DIR}" \
         --logs-dir "${LOGS_DIR}"; then
-        bashio::log.info "Renewal check finished."
+        bashio::log.info "Renewal check finished, next check in ${renew_interval} hour(s)."
+        sleep $((renew_interval * 3600))
     else
-        bashio::log.error "Renewal check failed, retrying in ${renew_interval} hour(s)."
+        bashio::log.error "Renewal attempt failed, retrying in ${renew_retry_interval} hour(s)."
+        sleep $((renew_retry_interval * 3600))
     fi
-    sleep $((renew_interval * 3600))
 done
