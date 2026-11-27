@@ -52,7 +52,19 @@ The token is stored with `0600` permissions in `/data/scaleway-credentials.ini` 
 
 ## Using the certificate
 
-The certificate is available in the `ssl` share of your Home Assistant host. To serve Home Assistant itself over HTTPS, add to `configuration.yaml`:
+The certificate is available in the `ssl` share of your Home Assistant host as `fullchain.pem` and `privkey.pem`.
+
+### Serve Home Assistant over HTTPS via the network settings
+
+1. Wait until the app has issued the certificate (check the app log, or confirm the files exist in the `ssl` share).
+2. In Home Assistant, go to **Settings > System > Network**.
+3. In the **HTTP server** section, set:
+   - **SSL certificate path**: `/ssl/fullchain.pem`
+   - **SSL key path**: `/ssl/privkey.pem`
+4. On the same page, set the **Home Assistant URL** to `https://<your-domain>` so browsers and companion apps connect over HTTPS.
+5. Save. Home Assistant restarts and asks an administrator to confirm the new settings — confirm within 5 minutes, otherwise it falls back to the previous settings.
+
+On older Home Assistant versions where the HTTP server is still configured in YAML, add to `configuration.yaml` instead and restart Home Assistant:
 
 ```yaml
 http:
@@ -60,7 +72,9 @@ http:
   ssl_key: /ssl/privkey.pem
 ```
 
-Then restart Home Assistant. Other apps that map the `ssl` share can use `/ssl/fullchain.pem` and `/ssl/privkey.pem` as well.
+Home Assistant reads the certificate files when the HTTP server starts, so restart Home Assistant after a renewal to serve the renewed certificate.
+
+Other apps that map the `ssl` share can use `/ssl/fullchain.pem` and `/ssl/privkey.pem` as well.
 
 ## Troubleshooting
 
