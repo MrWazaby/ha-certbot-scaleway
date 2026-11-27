@@ -9,11 +9,6 @@ url: "https://github.com/MrWazaby/ha-certbot-scaleway/tree/main/certbot_scaleway
 arch:
   - aarch64
   - amd64
-  - armhf
-  - armv7
-  - i386
-boot: auto
-startup: application
 init: false
 map:
   - ssl:rw
